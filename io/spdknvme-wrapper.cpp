@@ -68,9 +68,9 @@ struct CBContextBase{
     static void cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl);
 
     // for vector io
-    iovector_view iov_view;
-    size_t idx = 0;
-    size_t off = 0;
+    struct iovec *iov;  // origin iov
+    int iovcnt;         // origin iovcnt
+    IOVector iovec;
     static void reset_sgl_fn(void *cb_ctx, uint32_t offset);
     static int next_sge_fn(void *cb_ctx, void **address, uint32_t *length);
 };
@@ -86,30 +86,23 @@ void CBContextBase::cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl) {
 void CBContextBase::reset_sgl_fn(void *cb_ctx, uint32_t offset) {
     LOG_DEBUG("get into reset_sgl_fn", VALUE(offset));
     auto ctx = static_cast<CBContextBase*>(cb_ctx);
-    assert(offset < ctx->iov_view.sum());
-    ctx->idx = 0;
-    size_t remain = offset;
-    while (remain) {
-        size_t provide = ctx->iov_view[ctx->idx].iov_len;
-        if (provide <= remain) {
-            ctx->idx++;
-            remain -= provide;
-        }
-        else {
-            break;
-        }
-    }
-    ctx->off = remain;
+    ctx->iovec.clear();
+    for (int i=0; i<ctx->iovcnt; i++) ctx->iovec.push_back(ctx->iov[i]);
+    ctx->iovec.extract_front(offset);
 }
 
 int CBContextBase::next_sge_fn(void *cb_ctx, void **address, uint32_t *length) {
     auto ctx = static_cast<CBContextBase*>(cb_ctx);
-    *address = (char*)(ctx->iov_view[ctx->idx].iov_base) + ctx->off;
-    *length = ctx->iov_view[ctx->idx].iov_len - ctx->off;
-    LOG_DEBUG("get into next_sge_fn", VALUE(ctx->idx), VALUE(*length));
-    ctx->off = 0;
-    ctx->idx++;
-    return 0;
+    if (ctx->iovec.sum() > 0) {
+        *address = ctx->iovec.front().iov_base;
+        *length = ctx->iovec.front().iov_len;
+        LOG_DEBUG("get into next_sge_fn", VALUE(*length));
+        ctx->iovec.pop_front();
+        return 0;
+    }
+    else {
+        LOG_ERROR_RETURN(0, -1, "ctx->iov_view is empty");
+    }
 }
 
 int nvme_env_init() {
@@ -213,7 +206,8 @@ int nvme_ns_cmd_read(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, voi
 
 static int vec_io_helper(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags, spdk_nvme_ns_cmd_rwv rwv_fn) {
     CBContextBase ctx;
-    ctx.iov_view.assign(iov, iovcnt);
+    ctx.iov = iov;
+    ctx.iovcnt = iovcnt;
     int rc = rwv_fn(ns, qpair, lba, lba_count, CBContextBase::cb_fn, &ctx, io_flags, CBContextBase::reset_sgl_fn, CBContextBase::next_sge_fn);
     if (rc != 0) return rc;
     ctx.awaiter.suspend();
