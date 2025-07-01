@@ -9,22 +9,22 @@
 class SPDKNVMe {
 public:
     void init() {
-        ASSERT_EQ(photon::init(), 0);
         ASSERT_EQ(photon::spdk::nvme_env_init(), 0);
         ctrlr = photon::spdk::nvme_probe_attach(trid_str);
         ASSERT_NE(ctrlr, nullptr);
         ns = photon::spdk::nvme_get_namespace(ctrlr, nsid);
         ASSERT_NE(ns, nullptr);
+        ASSERT_EQ(photon::init(), 0);
     }
 
     void fini() {
         GTEST_LOG_(INFO) << "SPDK NVMe fini";
+        photon::fini();
+        GTEST_LOG_(INFO) << "after photon::fini";
         photon::spdk::nvme_detach(ctrlr);
         GTEST_LOG_(INFO) << "after detach";
         photon::spdk::nvme_env_fini();
         GTEST_LOG_(INFO) << "after nvme_env_fini";
-        photon::fini();
-        GTEST_LOG_(INFO) << "after photon::fini";
     }
 
     static const char* trid_str;
@@ -150,7 +150,9 @@ TEST_F(SPDKNVMeTest, rwv) {
     iovs_read.push_back((char*)buf_read + sectorsz, sectorsz);
     iovs_read.push_back((char*)buf_read + 2 * sectorsz, 2 * sectorsz);
 
+    GTEST_LOG_(INFO) << "writev";
     EXPECT_EQ(photon::spdk::nvme_ns_cmd_writev(ns, qpair, iovs_write.iovec(), iovs_write.iovcnt(), nsec, nsec, 0), 0);
+    GTEST_LOG_(INFO) << "readv";
     EXPECT_EQ(photon::spdk::nvme_ns_cmd_readv(ns, qpair, iovs_read.iovec(), iovs_read.iovcnt(), nsec, nsec, 0), 0);
 
     // checking

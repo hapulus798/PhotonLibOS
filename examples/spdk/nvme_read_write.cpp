@@ -6,11 +6,6 @@ int main() {
     char trid_str[] = "trtype:pcie traddr:0000:86:00.0";
     uint32_t nsid = 1;
 
-    if (photon::init() != 0) {
-        LOG_ERROR_RETURN(0, -1, "photon::init failed");
-    }
-    DEFER(photon::fini());
-
     if (photon::spdk::nvme_env_init() != 0) {
         LOG_ERROR_RETURN(0, -1, "nvme_env_init failed");
     }
@@ -26,6 +21,11 @@ int main() {
     if (ns == nullptr) {
         LOG_ERROR_RETURN(0, -1, "nvme_get_namespace failed");
     }
+
+    if (photon::init() != 0) {
+        LOG_ERROR_RETURN(0, -1, "photon::init failed");
+    }
+    DEFER(photon::fini());
 
     LOG_INFO("alloc io qpair");
     struct spdk_nvme_qpair* qpair = photon::spdk::nvme_ctrlr_alloc_io_qpair(ctrlr, nullptr, 0);

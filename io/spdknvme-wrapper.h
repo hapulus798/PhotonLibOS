@@ -41,31 +41,5 @@ int nvme_ns_cmd_writev(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, s
 
 int nvme_ns_cmd_readv(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags);
 
-
-// internal
-
-struct CBContextBase{
-    int rc = 0;
-    Awaiter<PhotonContext> awaiter;
-    static void cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl);
-
-    // for vector io
-    iovector_view iov_view;
-    size_t idx = 0;
-    size_t off = 0;
-    static void reset_sgl_fn(void *cb_ctx, uint32_t offset);
-    static int next_sge_fn(void *cb_ctx, void **address, uint32_t *length);
-};
-
-template <typename F, typename... Args>
-int nvme_call(F func, Args... args) {
-    CBContextBase ctx;
-    int rc = func(args..., &ctx);
-    if (rc != 0) return rc;
-    ctx.awaiter.suspend();
-    return ctx.rc;
-}
-
-
 }   // namespace spdk
 }   // namespace photon

@@ -40,8 +40,40 @@ struct nvme_qpair {
     }
 };
 
-static std::unordered_map<struct spdk_nvme_ctrlr*, std::shared_ptr<ObjectCache<vcpu_base*, nvme_qpair*>>> g_qpair_manager;
+using qpm = ObjectCache<struct spdk_nvme_ctrlr*, struct nvme_qpair*>;
+static qpm* get_qpair_manager() {
+    LOG_DEBUG("into get_qpair_manager");
+    thread_local static std::unique_ptr<qpm> qpair_manager;
+    auto destroy_qpair_manager = []{
+        LOG_DEBUG("into destroy_qpair_manager");
+        if (qpair_manager != nullptr) {
+            LOG_DEBUG("destroy");
+            qpair_manager.reset();
+        }
+        LOG_DEBUG("out destroy_qpair_manager");
+    };
+    if (qpair_manager == nullptr) {
+        LOG_DEBUG("create and add destroy hook");
+        qpair_manager = std::make_unique<qpm>(3000000);
+        photon::fini_hook(destroy_qpair_manager);
+    }
+    LOG_DEBUG("out get_qpair_manager");
+    return qpair_manager.get();
+}
 
+
+struct CBContextBase{
+    int rc = 0;
+    Awaiter<PhotonContext> awaiter;
+    static void cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl);
+
+    // for vector io
+    iovector_view iov_view;
+    size_t idx = 0;
+    size_t off = 0;
+    static void reset_sgl_fn(void *cb_ctx, uint32_t offset);
+    static int next_sge_fn(void *cb_ctx, void **address, uint32_t *length);
+};
 void CBContextBase::cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl) {
     auto ctx = static_cast<CBContextBase*>(cb_ctx);
     if (spdk_nvme_cpl_is_error(cpl)) {
@@ -52,6 +84,7 @@ void CBContextBase::cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl) {
 }
 
 void CBContextBase::reset_sgl_fn(void *cb_ctx, uint32_t offset) {
+    LOG_DEBUG("get into reset_sgl_fn", VALUE(offset));
     auto ctx = static_cast<CBContextBase*>(cb_ctx);
     assert(offset < ctx->iov_view.sum());
     ctx->idx = 0;
@@ -73,6 +106,7 @@ int CBContextBase::next_sge_fn(void *cb_ctx, void **address, uint32_t *length) {
     auto ctx = static_cast<CBContextBase*>(cb_ctx);
     *address = (char*)(ctx->iov_view[ctx->idx].iov_base) + ctx->off;
     *length = ctx->iov_view[ctx->idx].iov_len - ctx->off;
+    LOG_DEBUG("get into next_sge_fn", VALUE(ctx->idx), VALUE(*length));
     ctx->off = 0;
     ctx->idx++;
     return 0;
@@ -113,19 +147,11 @@ struct spdk_nvme_ctrlr* nvme_probe_attach(const char* trid_str) {
 
     struct spdk_nvme_ctrlr *ctrlr = nullptr;
     spdk_nvme_probe(&trid, &ctrlr, probe_cb, attach_cb, nullptr);
-
-    if (ctrlr != nullptr) {
-        g_qpair_manager.emplace(ctrlr, new ObjectCache<vcpu_base*, nvme_qpair*>(3000000));
-        return ctrlr;
-    }
-    else {
-        LOG_ERROR_RETURN(0, nullptr, "nvme_probe_attach failed");
-    }
+    return ctrlr;
 }
 
 int nvme_detach(struct spdk_nvme_ctrlr* ctrlr) {
     LOG_DEBUG("get into nvme_detach");
-    g_qpair_manager.erase(ctrlr);
     spdk_nvme_detach(ctrlr);
     LOG_DEBUG("get out nvme_detach");
     return 0;
@@ -137,7 +163,7 @@ struct spdk_nvme_ns* nvme_get_namespace(struct spdk_nvme_ctrlr* ctrlr, uint32_t 
 
 struct spdk_nvme_qpair* nvme_ctrlr_alloc_io_qpair(struct spdk_nvme_ctrlr* ctrlr, struct spdk_nvme_io_qpair_opts* opts, size_t opts_size) {
     LOG_DEBUG("before acquired qpair");
-    auto m_qpair = g_qpair_manager[ctrlr]->acquire(get_vcpu(), [&]() -> struct nvme_qpair* {
+    auto m_qpair = get_qpair_manager()->acquire(ctrlr, [&]() -> struct nvme_qpair* {
         LOG_DEBUG("before new struct nvme_qpair");
         return new nvme_qpair(ctrlr, opts, opts_size);
     });
@@ -152,45 +178,54 @@ struct spdk_nvme_qpair* nvme_ctrlr_alloc_io_qpair(struct spdk_nvme_ctrlr* ctrlr,
 
 int nvme_ctrlr_free_io_qpair(struct spdk_nvme_ctrlr* ctrlr, struct spdk_nvme_qpair* qpair) {
     LOG_DEBUG("before release qpair");
-    g_qpair_manager[ctrlr]->release(get_vcpu(), true);
+    get_qpair_manager()->release(ctrlr, true);
     LOG_DEBUG("after release qpair");
     return 0;
 }
 
+typedef int (*spdk_nvme_ns_cmd_rw) (struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair, void *payload,
+			                    uint64_t lba, uint32_t lba_count,
+                                spdk_nvme_cmd_cb cb_fn, void *cb_arg,
+                                uint32_t io_flags);
 
-static int io_helper(bool is_write, struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, void* buffer, uint64_t lba, uint32_t lba_count, uint32_t io_flags, void* ctx) {
-    if (is_write) {
-        return spdk_nvme_ns_cmd_write(ns, qpair, buffer, lba, lba_count, CBContextBase::cb_fn, ctx, io_flags);
-    } else {
-        return spdk_nvme_ns_cmd_read(ns, qpair, buffer, lba, lba_count, CBContextBase::cb_fn, ctx, io_flags);
-    }
+typedef int (*spdk_nvme_ns_cmd_rwv) (struct spdk_nvme_ns *ns, struct spdk_nvme_qpair *qpair,
+                                uint64_t lba, uint32_t lba_count,
+                                spdk_nvme_cmd_cb cb_fn, void *cb_arg, uint32_t io_flags,
+                                spdk_nvme_req_reset_sgl_cb reset_sgl_fn,
+                                spdk_nvme_req_next_sge_cb next_sge_fn);
+
+
+static int io_helper(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, void* buffer, uint64_t lba, uint32_t lba_count, uint32_t io_flags, spdk_nvme_ns_cmd_rw rw_fn) {
+    CBContextBase ctx;
+    int rc = rw_fn(ns, qpair, buffer, lba, lba_count, CBContextBase::cb_fn, &ctx, io_flags);
+    if (rc != 0) return rc;
+    ctx.awaiter.suspend();
+    return ctx.rc;
 }
 
 int nvme_ns_cmd_write(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, void* buffer, uint64_t lba, uint32_t lba_count, uint32_t io_flags) {
-    return nvme_call(&io_helper, true, ns, qpair, buffer, lba, lba_count, io_flags);
+    return io_helper(ns, qpair, buffer, lba, lba_count, io_flags, &spdk_nvme_ns_cmd_write);
 }
 
 int nvme_ns_cmd_read(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, void* buffer, uint64_t lba, uint32_t lba_count, uint32_t io_flags) {
-    return nvme_call(&io_helper, false, ns, qpair, buffer, lba, lba_count, io_flags);
+    return io_helper(ns, qpair, buffer, lba, lba_count, io_flags, &spdk_nvme_ns_cmd_read);
 }
 
-static int vec_io_helper(bool is_write, struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags, void* ctx) {
-    auto ctx_rwv = static_cast<CBContextBase*>(ctx);
-    ctx_rwv->iov_view.assign(iov, iovcnt);
-    if (is_write) {
-        return spdk_nvme_ns_cmd_writev(ns, qpair, lba, lba_count, CBContextBase::cb_fn, ctx_rwv, io_flags, CBContextBase::reset_sgl_fn, CBContextBase::next_sge_fn);
-    }
-    else {
-        return spdk_nvme_ns_cmd_readv(ns, qpair, lba, lba_count, CBContextBase::cb_fn, ctx_rwv, io_flags, CBContextBase::reset_sgl_fn, CBContextBase::next_sge_fn);
-    }
+static int vec_io_helper(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags, spdk_nvme_ns_cmd_rwv rwv_fn) {
+    CBContextBase ctx;
+    ctx.iov_view.assign(iov, iovcnt);
+    int rc = rwv_fn(ns, qpair, lba, lba_count, CBContextBase::cb_fn, &ctx, io_flags, CBContextBase::reset_sgl_fn, CBContextBase::next_sge_fn);
+    if (rc != 0) return rc;
+    ctx.awaiter.suspend();
+    return ctx.rc;
 }
 
 int nvme_ns_cmd_writev(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags) {
-    return nvme_call(&vec_io_helper, true, ns, qpair, iov, iovcnt, lba, lba_count, io_flags);
+    return vec_io_helper(ns, qpair, iov, iovcnt, lba, lba_count, io_flags, &spdk_nvme_ns_cmd_writev);
 }
 
 int nvme_ns_cmd_readv(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags) {
-    return nvme_call(&vec_io_helper, false, ns, qpair, iov, iovcnt, lba, lba_count, io_flags);
+    return vec_io_helper(ns, qpair, iov, iovcnt, lba, lba_count, io_flags, &spdk_nvme_ns_cmd_readv);
 }
 
 }   // namespace spdk
