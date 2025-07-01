@@ -16,8 +16,10 @@ photon spdk bdev wrapper rely on some spdk dynamic libraries, and these librarie
 example
 ``` shell
 sudo ./build/examples-output/bdev-example --json ./examples/spdk/bdev.json
+sudo ./build/examples-output/nvme-example
 ```
 tests
 ``` shell
 sudo ./build/output/test-spdkbdev
+sudo ./build/output/test-spdknvme
 ```
