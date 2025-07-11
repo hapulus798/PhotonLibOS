@@ -106,9 +106,9 @@ function(build_from_src [dep])
                 curl
                 URL ${PHOTON_CURL_SOURCE}
                 URL_MD5 1211d641ae670cebce361ab6a7c6acff
-                CMAKE_ARGS -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DCMAKE_INSTALL_PREFIX=${BINARY_DIR}
+                CMAKE_ARGS -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DCMAKE_INSTALL_PREFIX=${BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib
                     -DBUILD_SHARED_LIBS=OFF -DHTTP_ONLY=ON -DBUILD_CURL_EXE=OFF
-                    -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+                    -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCURL_USE_LIBSSH2=OFF
         )
         add_dependencies(curl openssl)
         set(CURL_INCLUDE_DIRS ${BINARY_DIR}/include PARENT_SCOPE)
@@ -136,9 +136,9 @@ function(build_from_src [dep])
                 CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${BINARY_DIR}
                 UPDATE_DISCONNECTED ON
                 BUILD_IN_SOURCE ON
-                CONFIGURE_COMMAND meson build --prefix ${BINARY_DIR} -Dc_args=-fPIC
+                CONFIGURE_COMMAND meson build --prefix ${BINARY_DIR} -Dc_args=-fPIC -Dlibdir=lib
                 BUILD_COMMAND ninja -C build
-                INSTALL_COMMAND bash -c "meson install --no-rebuild -C build; ln -s lib64 ${BINARY_DIR}/lib"
+                INSTALL_COMMAND meson install --no-rebuild -C build
                 LOG_CONFIGURE ON
                 LOG_BUILD ON
                 LOG_INSTALL ON
@@ -215,7 +215,7 @@ function(build_from_src [dep])
         set(SPDK_INCLUDE_DIRS ${SPDK_ROOT}/include)
         set(SPDK_LIBRARY_DIR ${SPDK_ROOT}/lib)
         set(SPDK_LIBRARIES)
-        set(SPDK_LIBRARY_NAMES 
+        set(SPDK_LIBRARY_NAMES
         spdk_accel_ioat
         spdk_accel
         spdk_bdev_aio
@@ -292,8 +292,8 @@ function(build_from_src [dep])
                 BUILD_IN_SOURCE ON
                 SOURCE_SUBDIR lib
                 CONFIGURE_COMMAND mkdir -p ${BINARY_DIR}/bin COMMAND mkdir -p ${BINARY_DIR}/include COMMAND mkdir -p ${BINARY_DIR}/lib
-                BUILD_COMMAND bash -c "PREFIX=${PROJECT_BINARY_DIR}/fstack-build PKG_CONFIG_PATH=${PROJECT_BINARY_DIR}/dpdk-build/lib64/pkgconfig CONF_CFLAGS=-fPIC make"
-                INSTALL_COMMAND bash -c "PKG_CONFIG_PATH=${PROJECT_BINARY_DIR}/dpdk-build/lib64/pkgconfig make install PREFIX=${BINARY_DIR} PREFIX_INCLUDE=${BINARY_DIR}/include PREFIX_BIN=${BINARY_DIR}/bin"
+                BUILD_COMMAND bash -c "PREFIX=${PROJECT_BINARY_DIR}/fstack-build PKG_CONFIG_PATH=${PROJECT_BINARY_DIR}/dpdk-build/lib/pkgconfig:$PKG_CONFIG_PATH CONF_CFLAGS=-fPIC make"
+                INSTALL_COMMAND bash -c "PKG_CONFIG_PATH=${PROJECT_BINARY_DIR}/dpdk-build/lib/pkgconfig:$PKG_CONFIG_PATH make install PREFIX=${BINARY_DIR} PREFIX_INCLUDE=${BINARY_DIR}/include PREFIX_BIN=${BINARY_DIR}/bin"
                 LOG_CONFIGURE ON
                 LOG_BUILD ON
                 LOG_INSTALL ON
