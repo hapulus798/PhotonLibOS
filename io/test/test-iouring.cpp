@@ -18,6 +18,7 @@ limitations under the License.
 #include <cstdlib>
 #include <fcntl.h>
 #include <unordered_map>
+#include <chrono>
 #include <gflags/gflags.h>
 #include <photon/io/fd-events.h>
 #include <photon/io/signal.h>
@@ -608,6 +609,52 @@ TEST_F(event_engine, cascading_one_shot) {
     ASSERT_EQ(num_events, 0);
 
     photon::thread_join((photon::join_handle*) sub);
+}
+
+using TimePoint = std::chrono::high_resolution_clock::time_point;
+TEST(uring, performance) {
+    photon::init(INIT_EVENT_IOURING, INIT_IO_NONE);
+
+    uint64_t nbytes_per_req = 4096;
+    uint64_t bufsize = nbytes_per_req;
+    uint64_t total_requests = 262144;
+
+    void* buf = nullptr;
+    int rc = posix_memalign(&buf, 4096, bufsize);
+    EXPECT_NE(buf, nullptr);
+    EXPECT_EQ(rc, 0);
+    memset(buf, 0x5F, bufsize);
+
+    auto fd = iouring_open("/tmp/20250731/test_file", O_CREAT | O_RDWR | O_DIRECT, 0644);
+    ASSERT_EQ(fd > 0, true);
+
+    TimePoint start_time = std::chrono::high_resolution_clock::now();
+    off_t offset = 0;
+    for (int i=0; i<total_requests; i++) {
+        EXPECT_EQ(iouring_pwrite(fd, buf, nbytes_per_req, offset), nbytes_per_req);
+        offset += nbytes_per_req;
+    }
+    TimePoint end_time = std::chrono::high_resolution_clock::now();
+    double cost = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count() / 1000.0; // dura unit is us
+
+    TimePoint start_time1 = std::chrono::high_resolution_clock::now();
+    off_t offset1 = 0;
+    for (int i=0; i<total_requests; i++) {
+        EXPECT_EQ(iouring_pread(fd, buf, nbytes_per_req, offset1), nbytes_per_req);
+        offset1 += nbytes_per_req;
+    }
+    TimePoint end_time1 = std::chrono::high_resolution_clock::now();
+    double cost1 = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(end_time1 - start_time1).count() / 1000.0; // dura unit is us
+
+    double nbytes = (double)total_requests * nbytes_per_req / 1024.0 / 1024.0;
+    double write_thp = nbytes / (cost/1e6);
+    double read_thp = nbytes / (cost1/1e6);
+    printf("write thp: %.4f MiB/s, read thp: %.4f MiB/s\n", write_thp, read_thp);
+    printf("write cost: %.4f us, read cost: %.4f us\n", cost, cost1);
+
+    EXPECT_EQ(iouring_close(fd), 0);
+
+    photon::fini();
 }
 
 int main(int argc, char** arg) {

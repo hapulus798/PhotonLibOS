@@ -3,12 +3,15 @@
 #include <photon/common/expirecontainer.h>
 #include <photon/thread/thread.h>
 #include <photon/thread/thread11.h>
+#include <photon/io/fd-events.h>
 
 #include <unordered_map>
 
 
 namespace photon {
 namespace spdk {
+
+std::vector<uint8_t> nreap_stats;
 
 struct nvme_qpair {
     bool is_complete = false;
@@ -17,26 +20,33 @@ struct nvme_qpair {
 
     nvme_qpair(struct spdk_nvme_ctrlr* ctrlr, struct spdk_nvme_io_qpair_opts* opts, size_t opts_size) {
         assert(ctrlr != nullptr);
-        LOG_DEBUG("nvme qpair get into constructor");
+        // LOG_DEBUG("nvme qpair get into constructor");
         qpair = spdk_nvme_ctrlr_alloc_io_qpair(ctrlr, opts, opts_size);
-        LOG_DEBUG("after spdk alloc io qpair");
+        // LOG_DEBUG("after spdk alloc io qpair");
         jh = thread_enable_join(thread_create11([this]{
             while (!is_complete) {
+                // int32_t rc = spdk_nvme_qpair_process_completions(qpair, 0);
+                // nreap_stats.emplace_back(rc);
                 spdk_nvme_qpair_process_completions(qpair, 0);
                 thread_yield();
             }
         }));
-        LOG_DEBUG("nvme qpair get out constructor");
+        // LOG_DEBUG("nvme qpair get out constructor");
     }
 
     ~nvme_qpair() {
-        LOG_DEBUG("nvme qpair get into destructor");
+        // LOG_DEBUG("nvme qpair get into destructor");
         is_complete = true;
-        LOG_DEBUG("before join");
+        // LOG_DEBUG("before join");
         thread_join(jh);
-        LOG_DEBUG("after join");
+        // LOG_DEBUG("after join");
         spdk_nvme_ctrlr_free_io_qpair(qpair);
-        LOG_DEBUG("nvme qpair get out destructor");
+        // LOG_DEBUG("nvme qpair get out destructor");
+    }
+
+    int process_completions() {
+        assert(qpair != nullptr);
+        return spdk_nvme_qpair_process_completions(qpair, 0);
     }
 };
 
@@ -58,7 +68,9 @@ static qpm* get_qpair_manager() {
 
 struct CBContextBase{
     int rc = 0;
-    Awaiter<PhotonContext> awaiter;
+    // Awaiter<PhotonContext> awaiter;
+    photon::thread* th_id = photon::CURRENT;
+    // volatile bool flag = false;
     static void cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl);
 
     // for vector io
@@ -69,18 +81,21 @@ struct CBContextBase{
     static int next_sge_fn(void *cb_ctx, void **address, uint32_t *length);
 };
 void CBContextBase::cb_fn(void *cb_ctx, const struct spdk_nvme_cpl *cpl) {
+    // printf("callback execute at tid=%d\n", gettid());
     auto ctx = static_cast<CBContextBase*>(cb_ctx);
     if (spdk_nvme_cpl_is_error(cpl)) {
         LOG_ERROR("error: `", spdk_nvme_cpl_get_status_string(&cpl->status));
         ctx->rc = -1;
     }
-    ctx->awaiter.resume();
+    // ctx->awaiter.resume();
+    photon::thread_interrupt(ctx->th_id, EOK);
+    // ctx->flag = true;
 }
 
 void CBContextBase::reset_sgl_fn(void *cb_ctx, uint32_t offset) {
-    LOG_DEBUG("get into reset_sgl_fn ", VALUE(offset));
+    // LOG_DEBUG("get into reset_sgl_fn ", VALUE(offset));
     auto ctx = static_cast<CBContextBase*>(cb_ctx);
-    LOG_DEBUG("reset_sgl_fn ", VALUE(ctx->iovcnt));
+    // LOG_DEBUG("reset_sgl_fn ", VALUE(ctx->iovcnt));
     ctx->iovec.assign(ctx->iov, ctx->iovcnt);
     ctx->iovec.extract_front(offset);
 }
@@ -92,7 +107,7 @@ int CBContextBase::next_sge_fn(void *cb_ctx, void **address, uint32_t *length) {
     }
     *address = ctx->iovec.front().iov_base;
     *length = ctx->iovec.front().iov_len;
-    LOG_DEBUG("get into next_sge_fn", VALUE(*length));
+    // LOG_DEBUG("get into next_sge_fn", VALUE(*length));
     ctx->iovec.pop_front();
     return 0;
 }
@@ -147,12 +162,12 @@ struct spdk_nvme_ns* nvme_get_namespace(struct spdk_nvme_ctrlr* ctrlr, uint32_t 
 }
 
 struct spdk_nvme_qpair* nvme_ctrlr_alloc_io_qpair(struct spdk_nvme_ctrlr* ctrlr, struct spdk_nvme_io_qpair_opts* opts, size_t opts_size) {
-    LOG_DEBUG("before acquired qpair");
+    // LOG_DEBUG("before acquired qpair");
     auto m_qpair = get_qpair_manager()->acquire(ctrlr, [&]() -> struct nvme_qpair* {
-        LOG_DEBUG("before new struct nvme_qpair");
+        // LOG_DEBUG("before new struct nvme_qpair");
         return new nvme_qpair(ctrlr, opts, opts_size);
     });
-    LOG_DEBUG("after acquired qpair");
+    // LOG_DEBUG("after acquired qpair");
     if (m_qpair != nullptr) {
         return m_qpair->qpair;
     }
@@ -162,9 +177,9 @@ struct spdk_nvme_qpair* nvme_ctrlr_alloc_io_qpair(struct spdk_nvme_ctrlr* ctrlr,
 }
 
 int nvme_ctrlr_free_io_qpair(struct spdk_nvme_ctrlr* ctrlr, struct spdk_nvme_qpair* qpair) {
-    LOG_DEBUG("before release qpair");
+    // LOG_DEBUG("before release qpair");
     get_qpair_manager()->release(ctrlr, true);
-    LOG_DEBUG("after release qpair");
+    // LOG_DEBUG("after release qpair");
     return 0;
 }
 
@@ -176,7 +191,12 @@ static int io_helper(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, voi
     CBContextBase ctx;
     int rc = rw_fn(ns, qpair, buffer, lba, lba_count, CBContextBase::cb_fn, &ctx, io_flags);
     if (rc != 0) return rc;
-    ctx.awaiter.suspend();
+    // ctx.awaiter.suspend();
+    photon::thread_sleep(-1);
+    // while (!ctx.flag) {
+    //     photon::thread_yield();
+    // }
+    assert(errno == EOK);
     return ctx.rc;
 }
 
@@ -185,6 +205,7 @@ int nvme_ns_cmd_write(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, vo
 }
 
 int nvme_ns_cmd_read(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, void* buffer, uint64_t lba, uint32_t lba_count, uint32_t io_flags) {
+    // printf("submit request at tid=%d\n", gettid());
     return io_helper(ns, qpair, buffer, lba, lba_count, io_flags, &spdk_nvme_ns_cmd_read);
 }
 
@@ -197,7 +218,9 @@ static int vec_io_helper(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair,
         LOG_DEBUG("early failed, ", VALUE(rc));
         return rc;
     }
-    ctx.awaiter.suspend();
+    // ctx.awaiter.suspend();
+    photon::thread_sleep(-1);
+    assert(errno == EOK);
     return ctx.rc;
 }
 
@@ -206,7 +229,7 @@ int nvme_ns_cmd_writev(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, s
 }
 
 int nvme_ns_cmd_readv(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags) {
-    LOG_DEBUG(VALUE(iovcnt), VALUE(lba), VALUE(lba_count));
+    // LOG_DEBUG(VALUE(iovcnt), VALUE(lba), VALUE(lba_count));
     return vec_io_helper(ns, qpair, iov, iovcnt, lba, lba_count, io_flags, &spdk_nvme_ns_cmd_readv);
 }
 

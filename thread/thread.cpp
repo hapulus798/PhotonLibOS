@@ -378,6 +378,7 @@ namespace photon
             return q.empty();
         }
 
+        __attribute__((noinline))
         int push(thread *obj)
         {
             q.push_back(obj);
@@ -471,6 +472,7 @@ namespace photon
         std::atomic_bool foreground_locked {false},
                          background_locked {false};
 
+        __attribute__((noinline))
         void wait_while(std::atomic_bool& x) {
             while (unlikely(x.load(std::memory_order_acquire))) {
                 do { spin_wait(); }
@@ -479,6 +481,7 @@ namespace photon
         }
 
     public:
+        __attribute__((noinline))
         void foreground_lock() {
             // lock
             foreground_locked.store(true, std::memory_order_release);
@@ -486,6 +489,7 @@ namespace photon
             // wait if (unlikely) background locked
             wait_while(background_locked);
         }
+        __attribute__((noinline))
         bool background_try_lock() {
             while(true) {
                 // wait if (unlikely) foreground locked
@@ -505,9 +509,11 @@ namespace photon
             }
             return true;
         }
+        __attribute__((noinline))
         void foreground_unlock() {
             foreground_locked.store(false, std::memory_order_release);
         }
+        __attribute__((noinline))
         void background_unlock() {
             background_locked.store(false, std::memory_order_release);
         }

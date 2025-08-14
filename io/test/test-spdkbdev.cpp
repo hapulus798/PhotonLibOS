@@ -11,7 +11,8 @@ public:
     void init() {
         ASSERT_EQ(photon::init(), 0);
         photon::spdk::bdev_env_init(json_cfg_path);
-        photon::spdk::bdev_open_ext("Malloc0", true, &desc);
+        // photon::spdk::bdev_open_ext("Malloc0", true, &desc);
+        photon::spdk::bdev_open_ext("Nvme0n1", true, &desc);
         ASSERT_NE(desc, nullptr);
         ch = photon::spdk::bdev_get_io_channel(desc);
         ASSERT_NE(ch, nullptr);
@@ -30,7 +31,7 @@ public:
 };
 
 // path of bdev config json
-const char* SPDKBDev::json_cfg_path = "./examples/spdk/bdev.json";
+const char* SPDKBDev::json_cfg_path = "./examples/spdk/bdev_real.json";
 
 class SPDKBDevTestEnv : public ::testing::Environment {
 public:
@@ -244,6 +245,70 @@ TEST_F(SPDKBDevTest, rwv_blocks) {
     EXPECT_EQ(photon::spdk::bdev_readv_blocks(desc, ch, iov_read.iovec(), iov_read.iovcnt(), 0, 1), 0);
 
     EXPECT_EQ(memcmp(bufwrite, bufread, bufsz), 0);
+}
+
+
+using TimePoint = std::chrono::high_resolution_clock::time_point;
+
+class IOHelper {
+public:
+    IOHelper(struct spdk_bdev_desc* desc, struct spdk_io_channel* ch) : desc_(desc), ch_(ch) {
+        assert(desc_ != nullptr && ch_ != nullptr);
+    }
+
+    void IOFunc(void* buf, off_t block_offset, size_t block_count, bool iswrite) {
+        int rc = 0;
+        if (iswrite) rc = photon::spdk::bdev_write_blocks(desc_, ch_, buf, block_offset, block_count);
+        else rc = photon::spdk::bdev_read_blocks(desc_, ch_, buf, block_offset, block_count);
+        if (rc != 0) {
+            printf("IOFunc, rc=%d\n", rc);
+            assert(rc == 0);
+        }
+    }
+
+    void* GetIOBuffer(uint64_t nblocks, bool iswrite) {
+        uint64_t nbytes = nblocks * block_size_;
+        void* buf = spdk_zmalloc(nbytes, block_size_, nullptr, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
+        if (iswrite) memset(buf, 0x5F, nbytes);
+        return buf;
+    }
+
+    void FreeIOBuffer(void* buf) { spdk_free(buf); }
+
+    uint64_t GetBlockSize() const { return block_size_;}
+
+private:
+    struct spdk_bdev_desc* desc_ = nullptr;
+    struct spdk_io_channel* ch_ = nullptr;
+    uint64_t block_size_ = 512;
+};
+
+TEST_F(SPDKBDevTest, performance) {
+    uint64_t nblocks_per_req = 8;
+    uint64_t batch_size = 16;
+    uint64_t total_blocks = 2097152 * batch_size;
+    bool iswrite = false;
+
+    IOHelper io_helper(bdev_info->desc, bdev_info->ch);
+    void* buf = io_helper.GetIOBuffer(nblocks_per_req * batch_size, iswrite);
+    uint64_t block_size = io_helper.GetBlockSize();
+    uint64_t start_block = 0;
+    uint64_t remain = total_blocks;
+
+    TimePoint start_time = std::chrono::high_resolution_clock::now();
+    while (remain > 0) {
+        uint64_t thisone = std::min(remain, nblocks_per_req * batch_size);
+        io_helper.IOFunc(buf, start_block, thisone, iswrite);
+        remain -= thisone;
+        start_block += thisone;
+    }
+    TimePoint end_time = std::chrono::high_resolution_clock::now();
+
+    io_helper.FreeIOBuffer(buf);
+
+    double cost = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count() / 1000.0; // dura unit is us
+    double thp = (total_blocks * block_size / 1024.0 / 1024.0) / (cost / 1e6);
+    printf("thp: %.4f MiB/s, cost: %.4f us\n", thp, cost);
 }
 
 int main(int argc, char** argv) {

@@ -1,0 +1,19 @@
+sudo ./build/examples-output/io-perf --disk-path="/dev/nvme5n1" --disk-size=1073741824 --io_uring=true
+$bash run_io_perf.sh
+2025/08/08 16:43:22.908921|INFO |th=0000000000000000|io-perf.cpp:103|main:Specify disk /dev/nvme5n1 size 1073741824
+2025/08/08 16:43:22.909850|INFO |th=0000000000C428E0|iouring-wrapper.cpp:695|new_iouring_event_engine:Init event engine: iouring [is_master=1][setup_sqpoll=0][setup_sq_aff=0][sq_thread_cpu=0]
+2025/08/08 16:43:23.933323|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3543, BW: 1771 MB/s
+2025/08/08 16:43:24.933410|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3580, BW: 1790 MB/s
+2025/08/08 16:43:25.933492|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3555, BW: 1777 MB/s
+2025/08/08 16:43:26.933575|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3586, BW: 1793 MB/s
+2025/08/08 16:43:27.933654|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3538, BW: 1769 MB/s
+2025/08/08 16:43:28.933736|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3547, BW: 1773 MB/s
+2025/08/08 16:43:29.933818|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3621, BW: 1810 MB/s
+2025/08/08 16:43:30.933901|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3551, BW: 1775 MB/s
+2025/08/08 16:43:31.933994|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3542, BW: 1771 MB/s
+2025/08/08 16:43:32.934080|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3587, BW: 1793 MB/s
+2025/08/08 16:43:33.934165|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3557, BW: 1778 MB/s
+2025/08/08 16:43:34.934249|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3591, BW: 1795 MB/s
+2025/08/08 16:43:35.934340|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3568, BW: 1784 MB/s
+2025/08/08 16:43:36.934429|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3568, BW: 1784 MB/s
+2025/08/08 16:43:37.934514|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3578, BW: 1789 MB/s

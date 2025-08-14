@@ -145,7 +145,7 @@ function(build_from_src [dep])
                 CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${BINARY_DIR}
                 UPDATE_DISCONNECTED ON
                 BUILD_IN_SOURCE ON
-                CONFIGURE_COMMAND meson build --prefix ${BINARY_DIR} -Dc_args=-fPIC -Dlibdir=lib
+                CONFIGURE_COMMAND meson build --prefix ${BINARY_DIR} -Dc_args=-fPIC --buildtype=debug -Dlibdir=lib
                 BUILD_COMMAND ninja -C build
                 INSTALL_COMMAND meson install --no-rebuild -C build
                 LOG_CONFIGURE ON
@@ -198,7 +198,7 @@ function(build_from_src [dep])
                 DEPENDS dpdk
                 UPDATE_DISCONNECTED ON
                 BUILD_IN_SOURCE ON
-                CONFIGURE_COMMAND ./autogen.sh COMMAND ./configure --prefix=${BINARY_DIR} --libdir=${BINARY_DIR}/lib
+                CONFIGURE_COMMAND ./autogen.sh COMMAND ./configure --prefix=${BINARY_DIR} --libdir=${BINARY_DIR}/lib  --enable-debug
                 BUILD_COMMAND $(MAKE)
                 INSTALL_COMMAND $(MAKE) install
                 LOG_CONFIGURE ON

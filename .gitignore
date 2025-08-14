@@ -25,3 +25,8 @@
 /GRTAGS
 /GSYMS
 /GPATH
+
+# perf
+perfres
+perfres_flame
+perfres_tmp

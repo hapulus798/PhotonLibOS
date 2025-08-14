@@ -207,6 +207,7 @@ namespace photon
 
     class spinlock {
     public:
+        __attribute__((noinline))
         int lock() {
             while (unlikely(xchg())) {
                 while (likely(load())) {
@@ -215,18 +216,22 @@ namespace photon
             }
             return 0;
         }
+        __attribute__((noinline))
         int try_lock() {
             return (likely(!load()) &&
                     likely(!xchg())) ? 0 : -1;
         }
+        __attribute__((noinline))
         void unlock() {
             _lock.store(false, std::memory_order_release);
         }
     protected:
         std::atomic_bool _lock = {false};
+        __attribute__((noinline))
         bool xchg() {
             return _lock.exchange(true, std::memory_order_acquire);
         }
+        __attribute__((noinline))
         bool load() {
             return _lock.load(std::memory_order_relaxed);
         }

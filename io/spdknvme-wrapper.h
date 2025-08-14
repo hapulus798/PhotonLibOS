@@ -15,6 +15,7 @@
 #include <photon/photon.h>
 #include <photon/thread/awaiter.h>
 #include <photon/common/iovector.h>
+#include <vector>
 
 namespace photon {
 namespace spdk {
@@ -40,6 +41,8 @@ int nvme_ns_cmd_read(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, voi
 int nvme_ns_cmd_writev(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags);
 
 int nvme_ns_cmd_readv(struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, struct iovec *iov, int iovcnt, uint64_t lba, uint32_t lba_count, uint32_t io_flags);
+
+extern std::vector<uint8_t> nreap_stats;
 
 }   // namespace spdk
 }   // namespace photon

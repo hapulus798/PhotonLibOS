@@ -175,9 +175,9 @@ void _MsgCtxBase::cb_fn(struct spdk_bdev_io *bdev_io, bool success, void *cb_arg
     spdk_bdev_free_io(bdev_io);
     auto ctx = static_cast<_MsgCtxBase*>(cb_arg);
     ctx->success = success;
-    LOG_DEBUG("bdev_io_completion_cb: before resume");
+    // LOG_DEBUG("bdev_io_completion_cb: before resume");
     ctx->awaiter.resume();
-    LOG_DEBUG("bdev_io_completion_cb: after resume");
+    // LOG_DEBUG("bdev_io_completion_cb: after resume");
 }
 
 }   // namespace spdk

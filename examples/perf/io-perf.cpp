@@ -97,7 +97,7 @@ int main(int argc, char** arg) {
     if (FLAGS_disk_path.empty()) {
         LOG_ERROR_RETURN(0, -1, "need disk path");
     }
-    if (FLAGS_disk_size < 10'000'000'000UL) {
+    if (FLAGS_disk_size <= 0) {
         LOG_ERROR_RETURN(0, -1, "need disk size");
     }
     LOG_INFO("Specify disk ` size `", FLAGS_disk_path.c_str(), FLAGS_disk_size);

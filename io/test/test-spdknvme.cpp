@@ -4,6 +4,9 @@
 #include <photon/thread/workerpool.h>
 #include <photon/common/iovector.h>
 #include <photon/io/spdknvme-wrapper.h>
+#include <chrono>
+#include <csignal>
+#include <gflags/gflags.h>
 #include "../../test/gtest.h"
 
 class SPDKNVMe {
@@ -14,7 +17,10 @@ public:
         ASSERT_NE(ctrlr, nullptr);
         ns = photon::spdk::nvme_get_namespace(ctrlr, nsid);
         ASSERT_NE(ns, nullptr);
-        ASSERT_EQ(photon::init(), 0);
+        photon::PhotonOptions opt;
+        opt.use_pooled_stack_allocator = true;
+        opt.bypass_threadpool = true;
+        ASSERT_EQ(photon::init(photon::INIT_EVENT_DEFAULT, photon::INIT_IO_DEFAULT, opt), 0);
     }
 
     void fini() {
@@ -163,19 +169,27 @@ TEST_F(SPDKNVMeTest, multi_thread) {
     struct spdk_nvme_ctrlr* ctrlr = nvme_info->ctrlr;
     struct spdk_nvme_ns* ns = nvme_info->ns;
 
-    int nvcpu = 4;
-    photon::WorkPool wp(nvcpu, 0, 0, 0);
+    int nvcpu = 1;
+    int mode = 1;
+    photon::WorkPool wp(nvcpu, 0, 0, mode);
 
-    int ntest = 64;
+    // int ntest = 2097152;
+    int ntest = 1024;
     uint32_t sectorsz = spdk_nvme_ns_get_sector_size(ns);
+
+    struct spdk_nvme_io_qpair_opts opts;
+    spdk_nvme_ctrlr_get_default_io_qpair_opts(ctrlr, &opts, sizeof(opts));
+    printf("default io_queue_requests=%u\n", opts.io_queue_requests);   // SQ大小
+    printf("default io_queue_size=%u\n", opts.io_queue_size);           // CQ大小
+    opts.io_queue_requests = 1024;
 
     // writes
     GTEST_LOG_(INFO) << "writes";
     photon::semaphore sem;
     for (int i=0; i<ntest; i++) {
         wp.thread_migrate(photon::thread_create11([&](int idx){
-            GTEST_LOG_(INFO) << "write " << idx;
-            struct spdk_nvme_qpair* qpair = photon::spdk::nvme_ctrlr_alloc_io_qpair(ctrlr, nullptr, 0);
+            // GTEST_LOG_(INFO) << "write " << idx;
+            struct spdk_nvme_qpair* qpair = photon::spdk::nvme_ctrlr_alloc_io_qpair(ctrlr, &opts, sizeof(opts));
             EXPECT_NE(qpair, nullptr);
             DEFER(photon::spdk::nvme_ctrlr_free_io_qpair(ctrlr, qpair));
 
@@ -184,9 +198,9 @@ TEST_F(SPDKNVMeTest, multi_thread) {
             DEFER(spdk_free(buffer));
 
             memset(buffer, idx, sectorsz);
-            GTEST_LOG_(INFO) << "write before " << idx;
+            // GTEST_LOG_(INFO) << "write before " << idx;
             EXPECT_EQ(photon::spdk::nvme_ns_cmd_write(ns, qpair, buffer, idx, 1, 0), 0);
-            GTEST_LOG_(INFO) << "write after " << idx;
+            // GTEST_LOG_(INFO) << "write after " << idx;
             sem.signal(1);
         }, i));
     }
@@ -215,8 +229,187 @@ TEST_F(SPDKNVMeTest, multi_thread) {
 }
 
 
+
+using TimePoint = std::chrono::high_resolution_clock::time_point;
+
+// class IOHelper {
+// public:
+//     IOHelper(struct spdk_nvme_ctrlr* ctrlr, struct spdk_nvme_ns* ns) : ctrlr_(ctrlr), ns_(ns) {
+//         assert(ctrlr_ != nullptr && ns_ != nullptr);
+//         block_size_ = spdk_nvme_ns_get_sector_size(ns_);
+//         assert(block_size_ > 0);
+//         spdk_nvme_ctrlr_get_default_io_qpair_opts(ctrlr_, &opts, sizeof(opts));
+//         opts.io_queue_requests = 4096;
+//     }
+
+//     void IOFunc(struct spdk_nvme_qpair* qpair, void* buf, off_t block_offset, size_t block_count, bool iswrite) {
+//         int rc = 0;
+//         if (iswrite) rc = photon::spdk::nvme_ns_cmd_write(ns_, qpair, buf, block_offset, block_count, 0);
+//         else rc = photon::spdk::nvme_ns_cmd_read(ns_, qpair, buf, block_offset, block_count, 0);
+//         if (rc != 0) {
+//             printf("IOFunc, rc = %d, block_offset=%lu\n", rc, block_offset);
+//             assert(rc == 0);
+//         }
+//     }
+
+//     void* GetIOBuffer(uint64_t nblocks, bool iswrite) {
+//         uint64_t nbytes = nblocks * block_size_;
+//         void* buf = spdk_zmalloc(nbytes, block_size_, nullptr, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
+//         if (iswrite) memset(buf, 0x5F, nbytes);
+//         return buf;
+//     }
+
+//     void FreeIOBuffer(void* buf) { spdk_free(buf); }
+
+//     uint64_t GetBlockSize() const { return block_size_;}
+
+//     struct spdk_nvme_qpair* GetQPair() {
+//         return photon::spdk::nvme_ctrlr_alloc_io_qpair(ctrlr_, &opts, sizeof(opts));
+//     }
+
+//     void FreeQPair(struct spdk_nvme_qpair* qpair) {
+//         photon::spdk::nvme_ctrlr_free_io_qpair(ctrlr_, qpair);
+//     }
+
+// private:
+//     struct spdk_nvme_ctrlr *ctrlr_ = nullptr;
+//     struct spdk_nvme_ns *ns_ = nullptr;
+//     uint64_t block_size_ = 0;
+//     struct spdk_nvme_io_qpair_opts opts;
+// };
+
+// TEST_F(SPDKNVMeTest, performance) {
+//     uint64_t nblocks_per_req = 8;
+//     uint64_t batch_size = 1;
+//     uint64_t total_blocks = 2097152 * batch_size;
+//     bool iswrite = false;
+
+//     IOHelper io_helper(nvme_info->ctrlr, nvme_info->ns);
+//     void* buf = io_helper.GetIOBuffer(nblocks_per_req * batch_size, iswrite);
+//     uint64_t block_size = io_helper.GetBlockSize();
+//     uint64_t start_block = 0;
+//     uint64_t remain = total_blocks;
+
+//     auto qpair = io_helper.GetQPair();
+
+//     TimePoint start_time = std::chrono::high_resolution_clock::now();
+//     while (remain > 0) {
+//         uint64_t thisone = std::min(remain, nblocks_per_req * batch_size);
+//         io_helper.IOFunc(qpair, buf, start_block, thisone, iswrite);
+//         remain -= thisone;
+//         start_block += thisone;
+//     }
+//     TimePoint end_time = std::chrono::high_resolution_clock::now();
+
+//     io_helper.FreeQPair(qpair);
+//     io_helper.FreeIOBuffer(buf);
+
+//     double cost = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count() / 1000.0; // dura unit is us
+//     double thp = (total_blocks * block_size / 1024.0 / 1024.0) / (cost / 1e6);
+//     printf("thp: %.4f MiB/s, cost: %.4f us\n", thp, cost);
+// }
+
+// TEST_F(SPDKNVMeTest, performance) {
+//     auto ctrlr = nvme_info->ctrlr;
+//     auto ns = nvme_info->ns;
+//     struct spdk_nvme_io_qpair_opts opts;
+//     spdk_nvme_ctrlr_get_default_io_qpair_opts(ctrlr, &opts, sizeof(opts));
+//     opts.delay_cmd_submit = true;
+//     opts.io_queue_requests = 4096;
+//     opts.io_queue_size = 4096;
+//     auto qpair = photon::spdk::nvme_ctrlr_alloc_io_qpair(ctrlr, &opts, sizeof(opts));
+// }
+
+
+DEFINE_uint64(bs, 4096, "block size in bytes");
+DEFINE_uint64(iodepth, 128, "num of requests on the fly at the same time");
+
+static std::atomic<uint64_t> qps{0};
+#define ROUND_DOWN(N, S) ((N) & ~((S) - 1))
+
+TEST_F(SPDKNVMeTest, performance2) {
+    // std::signal(SIGINT, [](int signal){
+    //     if (signal == SIGINT) {
+    //         auto f = fopen(std::string("nreap_stats_"+std::to_string(FLAGS_iodepth)+"_"+std::to_string(FLAGS_bs)+".txt").c_str(), "w+");
+    //         for (auto& x: photon::spdk::nreap_stats) fprintf(f, "%d,", x);
+    //         fprintf(f, "\n");
+    //         fclose(f);
+    //     }
+    //     std::exit(0);
+    // });
+
+    const uint64_t BLOCKSIZE = FLAGS_bs;
+    const uint64_t LBACOUNT = BLOCKSIZE / 512;
+    const uint64_t IODEPTH = FLAGS_iodepth;
+
+    GTEST_LOG_(INFO) << "config: bs=" << BLOCKSIZE << "(i.e. " << BLOCKSIZE/1024 << "k, " << LBACOUNT << " sectors), iodepth=" << IODEPTH;
+
+    auto ctrlr = nvme_info->ctrlr;
+    auto ns = nvme_info->ns;
+    struct spdk_nvme_io_qpair_opts opts;
+    spdk_nvme_ctrlr_get_default_io_qpair_opts(ctrlr, &opts, sizeof(opts));
+    opts.delay_cmd_submit = true;
+    opts.io_queue_requests = 4096;
+    opts.io_queue_size = 4096;
+    auto qpair = photon::spdk::nvme_ctrlr_alloc_io_qpair(ctrlr, &opts, sizeof(opts));
+
+    auto task = [LBACOUNT, BLOCKSIZE](struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair){
+        auto random = [](uint64_t N) -> uint64_t {
+            static std::random_device rd;
+            static std::mt19937_64 gen(rd());
+            return gen() % N;
+        };
+        uint64_t max_offset = 1024 * 1024 * 1024UL * 50 / 512 - LBACOUNT;  // test range is 1GiB (same to fio's size=1g), should write this range first, or the thp is very high(guess directly return when meet zero)
+        void* buf = spdk_dma_zmalloc(BLOCKSIZE, 4096, nullptr);
+        uint64_t offset;
+        while (true) {
+            offset = random(max_offset);
+            EXPECT_EQ(0, photon::spdk::nvme_ns_cmd_read(ns, qpair, buf, offset, LBACOUNT, 0));
+            qps.fetch_add(1, std::memory_order_relaxed);
+        };
+    };
+
+    // auto task = [LBACOUNT, BLOCKSIZE](struct spdk_nvme_ns* ns, struct spdk_nvme_qpair* qpair, int idx, uint64_t begin_offset, uint64_t nblocks){
+    //     void* buf = spdk_dma_zmalloc(BLOCKSIZE, 4096, nullptr);
+    //     memset(buf, 0x5F, BLOCKSIZE);
+    //     uint64_t offset = begin_offset;
+    //     uint64_t remain = nblocks;
+    //     while (remain > 0) {
+    //         EXPECT_EQ(0, photon::spdk::nvme_ns_cmd_write(ns, qpair, buf, offset, LBACOUNT, 0));
+    //         offset += LBACOUNT;
+    //         remain -= LBACOUNT;
+    //         qps.fetch_add(1, std::memory_order_relaxed);
+    //     }
+    //     std::cerr << "complete: " << idx << std::endl;
+    // };
+
+    auto show_qps_loop = [BLOCKSIZE]{
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::cerr << "QPS: " << qps.load() << ", BW: " << qps.load() * BLOCKSIZE / 1024.0 / 1024.0 << " MiB/s" << std::endl;
+            qps.store(0, std::memory_order_relaxed);
+        }
+    };
+
+    new std::thread(show_qps_loop);
+
+    // uint64_t max_offset = 1024 * 1024 * 1024UL * 50 / 512;
+    // uint64_t eachone = max_offset / IODEPTH;
+    // uint64_t begin_offset = 0;
+
+    for (int i=0; i<IODEPTH; i++) {
+        photon::thread_create11(task, ns, qpair);
+        // photon::thread_create11(task, ns, qpair, i, begin_offset, eachone);
+        // begin_offset += eachone;
+    }
+
+    photon::thread_sleep(-1);
+}
+
+
 int main(int argc, char** argv) {
     testing::AddGlobalTestEnvironment(new SPDKNVMeTestEnv);
     testing::InitGoogleTest(&argc, argv);
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
     return RUN_ALL_TESTS();
 }
