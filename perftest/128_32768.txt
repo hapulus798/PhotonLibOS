@@ -1,0 +1,12 @@
+[  INFO ] /home/hongjingxuan.hjx/photon_github_spdk_nvme/io/test/test-spdknvme.cpp:345:: config: bs=32768(i.e. 32k, 64 sectors), iodepth=128
+QPS: 79015, BW: 2469.22 MiB/s
+QPS: 77024, BW: 2407 MiB/s
+QPS: 76962, BW: 2405.06 MiB/s
+QPS: 77023, BW: 2406.97 MiB/s
+QPS: 77742, BW: 2429.44 MiB/s
+QPS: 77494, BW: 2421.69 MiB/s
+QPS: 76759, BW: 2398.72 MiB/s
+QPS: 77331, BW: 2416.59 MiB/s
+QPS: 77294, BW: 2415.44 MiB/s
+QPS: 77196, BW: 2412.38 MiB/s
+QPS: 77328, BW: 2416.5 MiB/s

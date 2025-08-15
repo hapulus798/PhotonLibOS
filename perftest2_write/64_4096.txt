@@ -1,0 +1,40 @@
+[2025-08-14 19:39:40.477385] Starting SPDK v21.04.1-pre git sha1 7dc38f83f / DPDK 20.11.0 initialization...
+[2025-08-14 19:39:40.477445] [ DPDK EAL parameters: [2025-08-14 19:39:40.477454] photon_spdk_nvme_pcie [2025-08-14 19:39:40.477460] --no-shconf [2025-08-14 19:39:40.477466] -c 0x1 [2025-08-14 19:39:40.477473] --log-level=lib.eal:6 [2025-08-14 19:39:40.477478] --log-level=lib.cryptodev:5 [2025-08-14 19:39:40.477486] --log-level=user1:6 [2025-08-14 19:39:40.477492] --iova-mode=pa [2025-08-14 19:39:40.477500] --base-virtaddr=0x200000000000 [2025-08-14 19:39:40.477507] --match-allocations [2025-08-14 19:39:40.477514] --file-prefix=spdk_pid20500 [2025-08-14 19:39:40.477522] ]
+EAL: No available hugepages reported in hugepages-1048576kB
+ioat_rawdev_probe(): Init 0000:00:04.0 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:00:04.1 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:00:04.2 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:00:04.3 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:00:04.4 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:00:04.5 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:00:04.6 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:00:04.7 on NUMA node 0
+mlx5_pci: Unexpected error in DR drop action support detection
+mlx5_pci: no Verbs device matches PCI device 0000:3b:00.1, are kernel drivers loaded?
+common_mlx5: Failed to load driver = mlx5_pci.
+
+EAL: Requested device 0000:3b:00.1 cannot be used
+ioat_rawdev_probe(): Init 0000:80:04.0 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:80:04.1 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:80:04.2 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:80:04.3 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:80:04.4 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:80:04.5 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:80:04.6 on NUMA node 0
+ioat_rawdev_probe(): Init 0000:80:04.7 on NUMA node 0
+EAL: No legacy callbacks, legacy socket not created
+
+[  INFO ] /home/hongjingxuan.hjx/photon_github_spdk_nvme/io/test/test-spdknvme.cpp:51:: SetUp Success
+
+[  INFO ] /home/hongjingxuan.hjx/photon_github_spdk_nvme/io/test/test-spdknvme.cpp:345:: config: bs=4096(i.e. 4k, 8 sectors), iodepth=64
+QPS: 163471, BW: 638.559 MiB/s
+QPS: 162613, BW: 635.207 MiB/s
+QPS: 163349, BW: 638.082 MiB/s
+QPS: 161301, BW: 630.082 MiB/s
+QPS: 160207, BW: 625.809 MiB/s
+QPS: 158268, BW: 618.234 MiB/s
+QPS: 161768, BW: 631.906 MiB/s
+QPS: 158132, BW: 617.703 MiB/s
+QPS: 159907, BW: 624.637 MiB/s
+QPS: 162582, BW: 635.086 MiB/s
+QPS: 162995, BW: 636.699 MiB/s

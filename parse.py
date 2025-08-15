@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-rootdir = "./perftest"
+rootdir = "./perftest2_write"
 fnames = os.listdir(rootdir)
 for fname in fnames:
     path = "{}/{}".format(rootdir, fname)

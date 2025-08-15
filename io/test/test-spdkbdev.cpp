@@ -4,12 +4,17 @@
 #include <photon/thread/workerpool.h>
 #include <photon/common/iovector.h>
 #include <photon/io/spdkbdev-wrapper.h>
+#include <csignal>
+#include <gflags/gflags.h>
 #include "../../test/gtest.h"
 
 class SPDKBDev {
 public:
     void init() {
-        ASSERT_EQ(photon::init(), 0);
+        photon::PhotonOptions opt;
+        opt.use_pooled_stack_allocator = true;
+        opt.bypass_threadpool = true;
+        ASSERT_EQ(photon::init(photon::INIT_EVENT_DEFAULT, photon::INIT_IO_DEFAULT, opt), 0);
         photon::spdk::bdev_env_init(json_cfg_path);
         // photon::spdk::bdev_open_ext("Malloc0", true, &desc);
         photon::spdk::bdev_open_ext("Nvme0n1", true, &desc);
@@ -310,6 +315,92 @@ TEST_F(SPDKBDevTest, performance) {
     double thp = (total_blocks * block_size / 1024.0 / 1024.0) / (cost / 1e6);
     printf("thp: %.4f MiB/s, cost: %.4f us\n", thp, cost);
 }
+
+DEFINE_uint64(bs, 4096, "block size in bytes");
+DEFINE_uint64(iodepth, 128, "num of requests on the fly at the same time");
+DEFINE_uint32(size, 1, "total access data, unit is GiB");
+DEFINE_bool(iswrite, false, "randread or randwrite");
+
+static std::atomic<uint64_t> qps{0};
+#define ROUND_DOWN(N, S) ((N) & ~((S) - 1))
+
+TEST_F(SPDKBDevTest, performance2) {
+    std::signal(SIGINT, [](int signal){
+        if (signal == SIGINT) {
+            std::exit(0);
+        }
+    });
+
+    const uint64_t BLOCKSIZE = FLAGS_bs;
+    const uint64_t LBACOUNT = BLOCKSIZE / 512;
+    const uint64_t IODEPTH = FLAGS_iodepth;
+    const uint32_t TOTALGB = FLAGS_size;
+    const bool ISWRITE = FLAGS_iswrite;
+
+    GTEST_LOG_(INFO) << "config: size=" << TOTALGB << "GiB, bs=" << BLOCKSIZE << "(i.e. " << BLOCKSIZE/1024 << "k, " << LBACOUNT << " sectors), iodepth=" << IODEPTH;
+    GTEST_LOG_(INFO) << "config: iswrite=" << ISWRITE;
+
+    struct spdk_bdev_desc* desc = bdev_info->desc;
+    struct spdk_io_channel* ch = bdev_info->ch;
+
+    auto task_read = [LBACOUNT, BLOCKSIZE, TOTALGB](struct spdk_bdev_desc* desc, struct spdk_io_channel* ch){
+        auto random = [](uint64_t N) -> uint64_t {
+            static std::random_device rd;
+            static std::mt19937_64 gen(rd());
+            return gen() % N;
+        };
+        uint64_t max_offset = 1024 * 1024 * 1024UL * TOTALGB / 512 - LBACOUNT;  // test range is 1GiB (same to fio's size=1g), should write this range first, or the thp is very high(guess directly return when meet zero)
+        void* buf = spdk_dma_zmalloc(BLOCKSIZE, 4096, nullptr);
+        uint64_t offset;
+        while (true) {
+            offset = random(max_offset);
+            EXPECT_EQ(0, photon::spdk::bdev_read_blocks(desc, ch, buf, offset, LBACOUNT));
+            qps.fetch_add(1, std::memory_order_relaxed);
+        };
+    };
+
+    auto task_write = [LBACOUNT, BLOCKSIZE, TOTALGB](struct spdk_bdev_desc* desc, struct spdk_io_channel* ch){
+        auto random = [](uint64_t N) -> uint64_t {
+            static std::random_device rd;
+            static std::mt19937_64 gen(rd());
+            return gen() % N;
+        };
+        uint64_t max_offset = 1024 * 1024 * 1024UL * TOTALGB / 512 - LBACOUNT;
+        void* buf = spdk_dma_zmalloc(BLOCKSIZE, 4096, nullptr);
+        memset(buf, 0x5F, BLOCKSIZE);
+        uint64_t offset;
+        while (true) {
+            offset = random(max_offset);
+            EXPECT_EQ(0, photon::spdk::bdev_write_blocks(desc, ch, buf, offset, LBACOUNT));
+            qps.fetch_add(1, std::memory_order_relaxed);
+        };
+    };
+
+    auto show_qps_loop = [BLOCKSIZE]{
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::cerr << "QPS: " << qps.load() << ", BW: " << qps.load() * BLOCKSIZE / 1024.0 / 1024.0 << " MiB/s" << std::endl;
+            qps.store(0, std::memory_order_relaxed);
+        }
+    };
+
+    new std::thread(show_qps_loop);
+
+    if (ISWRITE) {
+        for (int i=0; i<IODEPTH; i++) {
+            photon::thread_create11(task_write, desc, ch);
+        }
+    }
+    else {
+        for (int i=0; i<IODEPTH; i++) {
+            photon::thread_create11(task_read, desc, ch);
+        }
+    }
+
+
+    photon::thread_sleep(-1);
+}
+
 
 int main(int argc, char** argv) {
     testing::AddGlobalTestEnvironment(new SPDKBDevTestEnv);
