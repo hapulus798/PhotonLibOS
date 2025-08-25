@@ -1,0 +1,41 @@
+[2025-08-22 09:23:25.056007] Starting SPDK v21.04.1-pre git sha1 7dc38f83f / DPDK 20.11.0 initialization...
+[2025-08-22 09:23:25.056065] [ DPDK EAL parameters: [2025-08-22 09:23:25.056074] photon_spdk_nvme_pcie [2025-08-22 09:23:25.056080] --no-shconf [2025-08-22 09:23:25.056086] -c 0x1 [2025-08-22 09:23:25.056095] --log-level=lib.eal:6 [2025-08-22 09:23:25.056101] --log-level=lib.cryptodev:5 [2025-08-22 09:23:25.056108] --log-level=user1:6 [2025-08-22 09:23:25.056116] --iova-mode=pa [2025-08-22 09:23:25.056128] --base-virtaddr=0x200000000000 [2025-08-22 09:23:25.056135] --match-allocations [2025-08-22 09:23:25.056142] --file-prefix=spdk_pid57003 [2025-08-22 09:23:25.056149] ]
+EAL: No available hugepages reported in hugepages-1048576kB
+ioat_rawdev_probe(): Init 0000:00:04.0 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:00:04.1 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:00:04.2 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:00:04.3 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:00:04.4 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:00:04.5 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:00:04.6 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:00:04.7 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+mlx5_pci: Unexpected error in DR drop action support detection
+mlx5_pci: no Verbs device matches PCI device 0000:3b:00.1, are kernel drivers loaded?
+common_mlx5: Failed to load driver = mlx5_pci.
+
+EAL: Requested device 0000:3b:00.1 cannot be used
+ioat_rawdev_probe(): Init 0000:80:04.0 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:80:04.1 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+
+ioat_rawdev_probe(): Init 0000:80:04.2 on NUMA node 0
+ioat_rawdev_create(): ioat_rawdev_create: Channel appears locked
+

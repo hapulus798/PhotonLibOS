@@ -40,6 +40,7 @@ DEFINE_uint64(io_size, 4096, "io size");
 DEFINE_bool(io_uring, false, "test io_uring or aio");
 DEFINE_bool(use_workpool, false, "dispatch read tasks to multi vCPU by using workpool");
 DEFINE_uint64(vcpu_num, 4, "vCPU num of the workpool");
+DEFINE_bool(iswrite, false, "pread or pwrite");
 
 #define ROUND_DOWN(N, S) ((N) & ~((S) - 1))
 
@@ -63,6 +64,21 @@ static void infinite_read(const uint64_t max_offset, photon::fs::IFile* src_file
     while (true) {
         uint64_t offset = ROUND_DOWN(random(max_offset), count);
         int ret = src_file->pread(buf, FLAGS_io_size, offset);
+        if (ret != (int) count) {
+            LOG_ERROR("read fail, count `, offset `, ret `, errno `", count, offset, ret, ERRNO());
+            exit(1);
+        }
+        qps.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+static void infinite_write(const uint64_t max_offset, photon::fs::IFile* src_file, IOAlloc* alloc) {
+    size_t count = FLAGS_io_size;
+    void* buf = alloc->alloc(count);
+    memset(buf, 0x5F, count);
+    while (true) {
+        uint64_t offset = ROUND_DOWN(random(max_offset), count);
+        int ret = src_file->pwrite(buf, FLAGS_io_size, offset);
         if (ret != (int) count) {
             LOG_ERROR("read fail, count `, offset `, ret `, errno `", count, offset, ret, ERRNO());
             exit(1);
@@ -117,7 +133,13 @@ int main(int argc, char** arg) {
     new std::thread(show_qps_loop);
 
     // Read only open with direct-IO
-    int flags = O_RDONLY | O_DIRECT;
+    int flags = O_DIRECT;
+    if (FLAGS_iswrite) {
+        flags |= O_WRONLY;
+    }
+    else {
+        flags |= O_RDONLY;
+    }
     auto file = photon::fs::open_localfile_adaptor(FLAGS_disk_path.c_str(), flags, 0644, fs_io_engine);
     if (!file) {
         LOG_ERROR_RETURN(0, -1, "open failed");
@@ -131,12 +153,22 @@ int main(int argc, char** arg) {
     photon::WorkPool* work_pool = nullptr;
     if (FLAGS_use_workpool) {
         work_pool = new photon::WorkPool(FLAGS_vcpu_num, ev_engine, io_engine, 0);
+        if (FLAGS_iswrite) {
+            LOG_ERROR_RETURN(0, -1, "workpool version doesn't support write");
+        }
         for (uint64_t i = 0; i < FLAGS_io_depth; i++) {
             photon::thread_create11(infinite_read_by_work_pool, max_offset, file, &io_alloc, work_pool);
         }
     } else {
-        for (uint64_t i = 0; i < FLAGS_io_depth; i++) {
-            photon::thread_create11(infinite_read, max_offset, file, &io_alloc);
+        if (FLAGS_iswrite) {
+            for (uint64_t i = 0; i < FLAGS_io_depth; i++) {
+                photon::thread_create11(infinite_write, max_offset, file, &io_alloc);
+            }
+        }
+        else {
+            for (uint64_t i = 0; i < FLAGS_io_depth; i++) {
+                photon::thread_create11(infinite_read, max_offset, file, &io_alloc);
+            }
         }
     }
 

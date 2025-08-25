@@ -30,3 +30,5 @@
 perfres
 perfres_flame
 perfres_tmp
+io-perf-libaio-read
+io-perf-uring-read
