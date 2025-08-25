@@ -1,0 +1,16 @@
+[37m2025/08/19 15:28:23.817788|INFO |th=0000000000000000|io-perf.cpp:103|main:Specify disk /dev/nvme5n1 size 1073741824
+[0m[37m2025/08/19 15:28:23.818546|INFO |th=0000000000B10E00|epoll.cpp:319|new_epoll_engine:Init epoll event engine: master
+[0m[37m2025/08/19 15:28:24.818813|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3829, BW: 1914 MB/s
+[0m[37m2025/08/19 15:28:25.818892|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3858, BW: 1929 MB/s
+[0m[37m2025/08/19 15:28:26.818964|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3900, BW: 1950 MB/s
+[0m[37m2025/08/19 15:28:27.819040|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3879, BW: 1939 MB/s
+[0m[37m2025/08/19 15:28:28.819117|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3868, BW: 1934 MB/s
+[0m[37m2025/08/19 15:28:29.819189|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3837, BW: 1918 MB/s
+[0m[37m2025/08/19 15:28:30.819267|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3832, BW: 1916 MB/s
+[0m[37m2025/08/19 15:28:31.819346|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3870, BW: 1935 MB/s
+[0m[37m2025/08/19 15:28:32.819427|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3868, BW: 1934 MB/s
+[0m[37m2025/08/19 15:28:33.819496|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3851, BW: 1925 MB/s
+[0m[37m2025/08/19 15:28:34.819566|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3866, BW: 1933 MB/s
+[0m[37m2025/08/19 15:28:35.819640|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3891, BW: 1945 MB/s
+[0m[37m2025/08/19 15:28:36.819711|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 3865, BW: 1932 MB/s
+[0m

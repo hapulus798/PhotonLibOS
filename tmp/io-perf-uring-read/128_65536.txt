@@ -1,0 +1,16 @@
+[37m2025/08/20 09:20:03.418605|INFO |th=0000000000000000|io-perf.cpp:103|main:Specify disk /dev/nvme5n1 size 1073741824
+[0m[37m2025/08/20 09:20:03.419354|INFO |th=0000000002570E00|iouring-wrapper.cpp:695|new_iouring_event_engine:Init event engine: iouring [is_master=1][setup_sqpoll=0][setup_sq_aff=0][sq_thread_cpu=0]
+[0m[37m2025/08/20 09:20:04.436328|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34391, BW: 2149 MB/s
+[0m[37m2025/08/20 09:20:05.436406|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34828, BW: 2176 MB/s
+[0m[37m2025/08/20 09:20:06.436480|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34860, BW: 2178 MB/s
+[0m[37m2025/08/20 09:20:07.436555|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 35056, BW: 2191 MB/s
+[0m[37m2025/08/20 09:20:08.436632|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34791, BW: 2174 MB/s
+[0m[37m2025/08/20 09:20:09.436707|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 35083, BW: 2192 MB/s
+[0m[37m2025/08/20 09:20:10.436781|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34990, BW: 2186 MB/s
+[0m[37m2025/08/20 09:20:11.436859|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34935, BW: 2183 MB/s
+[0m[37m2025/08/20 09:20:12.436932|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34685, BW: 2167 MB/s
+[0m[37m2025/08/20 09:20:13.437008|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34610, BW: 2163 MB/s
+[0m[37m2025/08/20 09:20:14.437083|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34612, BW: 2163 MB/s
+[0m[37m2025/08/20 09:20:15.437163|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34479, BW: 2154 MB/s
+[0m[37m2025/08/20 09:20:16.437235|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 34719, BW: 2169 MB/s
+[0m

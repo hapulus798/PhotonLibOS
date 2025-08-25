@@ -1,0 +1,13 @@
+$sudo ./build/examples-output/io-perf --disk-path="/dev/nvme5n1" --disk-size=1073741824 --io_uring=false --io_size=512 --io_depth=32
+2025/08/19 15:38:24.771467|INFO |th=0000000000000000|io-perf.cpp:103|main:Specify disk /dev/nvme5n1 size 1073741824
+2025/08/19 15:38:24.772225|INFO |th=0000000000908E00|epoll.cpp:319|new_epoll_engine:Init epoll event engine: master
+2025/08/19 15:38:25.772504|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 200594, BW: 97 MB/s
+2025/08/19 15:38:26.772583|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 200860, BW: 98 MB/s
+2025/08/19 15:38:27.772664|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 200328, BW: 97 MB/s
+2025/08/19 15:38:28.772743|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 198682, BW: 97 MB/s
+2025/08/19 15:38:29.772824|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 199552, BW: 97 MB/s
+2025/08/19 15:38:30.772907|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 199663, BW: 97 MB/s
+2025/08/19 15:38:31.772987|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 199046, BW: 97 MB/s
+2025/08/19 15:38:32.773068|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 199616, BW: 97 MB/s
+2025/08/19 15:38:33.773148|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 200673, BW: 97 MB/s
+2025/08/19 15:38:34.773228|INFO |th=0000000000000000|io-perf.cpp:55|show_qps_loop:QPS: 201104, BW: 98 MB/s
